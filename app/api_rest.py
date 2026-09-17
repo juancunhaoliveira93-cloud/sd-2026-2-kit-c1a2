@@ -13,11 +13,13 @@ Rodar:  uvicorn app.api_rest:app --reload --port 8000
 Docs:   http://localhost:8000/docs
 """
 import time
+import uuid
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from app.modelo import carregar_modelo
+from app import fila
 
 app = FastAPI(title="Servico de Inferencia - C1.A2", version="0.1.0")
 
@@ -54,20 +56,31 @@ def predict_sync(entrada: Entrada):
 
 
 # ------------------------------------------------------------------
-# TAREFA 1 - submissao assincrona
+# # TAREFA 1 - submissao assincrona
 # ------------------------------------------------------------------
-# @app.post("/predict", status_code=202)
-# def predict(entrada: Entrada):
-#     """Deve enfileirar a tarefa e devolver {"id": ...} SEM esperar."""
-#     # DICA: use app.fila.enfileirar(entrada.texto)
-#     raise NotImplementedError("implemente a submissao assincrona")
-
+@app.post("/predict", status_code=202)
+def predict(entrada: Entrada):
+    """Deve enfileirar a tarefa e devolver {"id": ...} SEM esperar."""
+    tarefa_id = str(uuid.uuid4())
+    
+    # Monta a estrutura da tarefa esperada pelo worker
+    tarefa = {"id": tarefa_id, "texto": entrada.texto}
+    
+    # Coloca na fila (ajuste o método se o fila.py usar outro nome para enfileirar)
+    fila.enfileirar(tarefa) 
+    
+    # Retorna imediatamente sem processar o modelo
+    return {"id": tarefa_id, "status": "processando"}
 
 # ------------------------------------------------------------------
 # TAREFA 2 - consulta do resultado
 # ------------------------------------------------------------------
-# @app.get("/resultado/{tarefa_id}")
-# def resultado(tarefa_id: str):
-#     """Deve devolver o resultado; 404 se o id nao existir."""
-#     # DICA: use app.fila.buscar_resultado(tarefa_id)
-#     raise NotImplementedError("implemente a consulta de resultado")
+@app.get("/resultado/{tarefa_id}")
+def resultado(tarefa_id: str):
+    """Deve devolver o resultado; 404 se o id nao existir."""
+    resultado_encontrado = fila.buscar_resultado(tarefa_id)
+    
+    if resultado_encontrado is None:
+        raise HTTPException(status_code=404, detail="Resultado não encontrado ou ainda processando")
+        
+    return resultado_encontrado
