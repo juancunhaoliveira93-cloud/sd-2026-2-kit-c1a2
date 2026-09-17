@@ -33,15 +33,24 @@ def main():
             resultado["tempo_ms"] = round((time.time() - inicio) * 1000, 2)
 
             # TAREFA 3: guarde o resultado para o cliente consultar depois.
-            # DICA: fila.guardar_resultado(tarefa["id"], resultado)
+            fila.guardar_resultado(tarefa["id"], resultado)
+            sucesso = True
+            
             raise NotImplementedError("guarde o resultado na TAREFA 3")
 
         except NotImplementedError:
             raise
         except Exception as erro:  # noqa: BLE001
-            # TAREFA 5: retentativa + dead-letter em vez de so registrar.
-            print(f"[worker] ERRO em {tarefa['id']}: {erro}")
-
+            # TAREFA 5: dead-letter em caso de falha após 3 tentativas
+            if not sucesso:
+                print(f"[worker] FALHA CRÍTICA. Enviando tarefa {tarefa['id']} para dead-letter.")
+            # Certifiquem-se de que a função existe no fila.py ou criem uma logica simples no Redis
+            try:
+                fila.enviar_dead_letter(tarefa) 
+            except AttributeError:
+                # Fallback caso não tenham implementado a dead letter no fila.py ainda
+                fila.guardar_resultado(tarefa["id"], {"status": "erro", "detalhe": "Falha após 3 tentativas."})
 
 if __name__ == "__main__":
     main()
+
