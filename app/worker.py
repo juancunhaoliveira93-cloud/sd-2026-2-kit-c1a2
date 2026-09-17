@@ -38,6 +38,15 @@ def main():
             
             raise NotImplementedError("guarde o resultado na TAREFA 3")
 
+        # TAREFA 6 (Victor): Log de requisições
+                tamanho_texto = len(tarefa.get("texto", ""))
+                print(f"[LOG] ID: {tarefa['id']} | Tamanho: {tamanho_texto} chars | Tempo: {tempo_execucao}ms")
+                break # Sai do loop de tentativas se deu certo
+    
+            except Exception as erro:
+                print(f"[worker] ERRO em {tarefa['id']} (Tentativa {tentativa + 1}/{max_tentativas}): {erro}")
+                time.sleep(1) # Pausa antes de tentar novamente (Backoff)
+
         except NotImplementedError:
             raise
         except Exception as erro:  # noqa: BLE001
