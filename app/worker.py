@@ -27,39 +27,42 @@ def main():
 
         print(f"[worker] processando {tarefa['id']}")
         inicio = time.time()
-        try:
-            resultado = modelo.prever(tarefa["texto"])
-            resultado["status"] = "pronto"
-            resultado["tempo_ms"] = round((time.time() - inicio) * 1000, 2)
-
-            # TAREFA 3: guarde o resultado para o cliente consultar depois.
-            fila.guardar_resultado(tarefa["id"], resultado)
-            sucesso = True
-            
-            raise NotImplementedError("guarde o resultado na TAREFA 3")
-
-        # TAREFA 6 (Victor): Log de requisições
+        
+        max_tentativas = 3
+        sucesso = False
+        
+        for tentativa in range(max_tentativas):
+            try:
+                # Executa a inferência
+                resultado = modelo.prever(tarefa["texto"])
+                resultado["status"] = "pronto"
+                tempo_execucao = round((time.time() - inicio) * 1000, 2)
+                resultado["tempo_ms"] = tempo_execucao
+    
+                # TAREFA 3 (Lucas): guarde o resultado para o cliente consultar depois.
+                fila.guardar_resultado(tarefa["id"], resultado)
+                sucesso = True
+                
+                # TAREFA 6 (Victor): Log de requisições
                 tamanho_texto = len(tarefa.get("texto", ""))
                 print(f"[LOG] ID: {tarefa['id']} | Tamanho: {tamanho_texto} chars | Tempo: {tempo_execucao}ms")
                 break # Sai do loop de tentativas se deu certo
     
             except Exception as erro:
+                # TAREFA 5 (Lucas): retentativa
                 print(f"[worker] ERRO em {tarefa['id']} (Tentativa {tentativa + 1}/{max_tentativas}): {erro}")
-                time.sleep(1) # Pausa antes de tentar novamente (Backoff)
-
-        except NotImplementedError:
-            raise
-        except Exception as erro:  # noqa: BLE001
-            # TAREFA 5: dead-letter em caso de falha após 3 tentativas
-            if not sucesso:
-                print(f"[worker] FALHA CRÍTICA. Enviando tarefa {tarefa['id']} para dead-letter.")
-            # Certifiquem-se de que a função existe no fila.py ou criem uma logica simples no Redis
+                time.sleep(1) # Pausa curta antes de tentar novamente
+        
+        # TAREFA 5 (Victor): dead-letter em caso de falha após 3 tentativas
+        if not sucesso:
+            print(f"[worker] FALHA CRÍTICA. Enviando tarefa {tarefa['id']} para dead-letter.")
             try:
+                # Se houver um método implementado no fila.py
                 fila.enviar_dead_letter(tarefa) 
             except AttributeError:
-                # Fallback caso não tenham implementado a dead letter no fila.py ainda
+                # Fallback: salva com status de erro para não travar o cliente
                 fila.guardar_resultado(tarefa["id"], {"status": "erro", "detalhe": "Falha após 3 tentativas."})
+
 
 if __name__ == "__main__":
     main()
-
