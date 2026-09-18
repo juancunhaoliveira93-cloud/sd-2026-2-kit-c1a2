@@ -13,7 +13,6 @@ Rodar:  uvicorn app.api_rest:app --reload --port 8000
 Docs:   http://localhost:8000/docs
 """
 import time
-import uuid
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -56,20 +55,17 @@ def predict_sync(entrada: Entrada):
 
 
 # ------------------------------------------------------------------
-# # TAREFA 1 - submissao assincrona
+# TAREFA 1 - submissao assincrona
 # ------------------------------------------------------------------
 @app.post("/predict", status_code=202)
 def predict(entrada: Entrada):
     """Deve enfileirar a tarefa e devolver {"id": ...} SEM esperar."""
-    tarefa_id = str(uuid.uuid4())
-    
-    # Monta a estrutura da tarefa esperada pelo worker
-    tarefa = {"id": tarefa_id, "texto": entrada.texto}
-    
-    # Coloca na fila (ajuste o método se o fila.py usar outro nome para enfileirar)
-    fila.enfileirar(tarefa) 
-    
-    # Retorna imediatamente sem processar o modelo
+
+    # O fila.py já espera uma string, gera o UUID, monta o dict e salva no Redis.
+    # Ele retorna o ID oficial que foi salvo no banco.
+    tarefa_id = fila.enfileirar(entrada.texto)
+
+    # Devolvemos o ID correto para o cliente
     return {"id": tarefa_id, "status": "processando"}
 
 # ------------------------------------------------------------------
